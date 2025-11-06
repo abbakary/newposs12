@@ -1001,6 +1001,7 @@
         <form method="post" enctype="multipart/form-data" action="{% url 'tracker:complete_order' pk=order.id %}" id="completeForm">
           {% csrf_token %}
           <input type="hidden" name="signature_data" id="signatureDataInput">
+          <input type="hidden" name="overrun_reason" id="completeOverrunHidden">
           <div class="row g-3">
             <div class="col-md-7">
               <label class="form-label fw-medium"><i class="fa fa-paperclip me-1"></i>Optional Completion Document</label>
