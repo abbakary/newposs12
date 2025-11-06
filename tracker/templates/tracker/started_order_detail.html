@@ -165,6 +165,13 @@
             document.getElementById('editOrderDetailsBtn').addEventListener('click', function(){
               const container = document.getElementById('orderServicesContainer');
               const label = document.getElementById('editOrderOptionsLabel');
+              const itemSection = document.getElementById('itemSelectionSection');
+              const itemSelect = document.getElementById('editOrderItemSelect');
+              const brandField = document.getElementById('editOrderBrand');
+              const helpText = document.getElementById('editOrderHelpText');
+              const helpSalesText = 'Selected item and add-ons will be saved to the order. Add-ons will be appended to the order description.';
+              const helpServiceText = 'Selected services will be appended to the order description for quick reference.';
+
               container.innerHTML = 'Loading...';
               fetch('{% url "tracker:api_service_types" %}', { method: 'GET', headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value, 'X-Requested-With': 'XMLHttpRequest' }})
                 .then(r => r.json())
@@ -174,6 +181,7 @@
                   const orderType = ('{{ order.type|default:'' }}').toLowerCase();
                   const serviceTypes = Array.isArray(data.service_types) ? data.service_types : [];
                   const addOns = Array.isArray(data.service_addons) ? data.service_addons : [];
+                  const inventoryItems = Array.isArray(data.inventory_items) ? data.inventory_items : [];
 
                   function renderCheckbox(name, mins, isChecked, extraBadge){
                     const safe = (name||'').replace(/[^A-Za-z0-9_]/g,'_');
@@ -188,7 +196,35 @@
                   }
 
                   if (orderType === 'sales') {
+                    // Show item selection for sales orders
+                    itemSection.style.display = 'block';
                     label.textContent = 'Select Add-ons';
+                    helpText.textContent = helpSalesText;
+
+                    // Populate item selection
+                    itemSelect.innerHTML = '<option value="">Select item</option>';
+                    if (inventoryItems.length) {
+                      inventoryItems.forEach(item => {
+                        const option = document.createElement('option');
+                        option.value = item.id;
+                        option.textContent = `${item.brand} - ${item.name}`;
+                        option.setAttribute('data-brand', item.brand);
+                        itemSelect.appendChild(option);
+                      });
+                    }
+
+                    // Set existing item if available
+                    const existingItem = ('{{ order.item_name|default:"" }}').trim();
+                    const existingBrand = ('{{ order.brand|default:"" }}').trim();
+                    if (existingItem) {
+                      const selectedItem = inventoryItems.find(i => i.name === existingItem && i.brand === existingBrand);
+                      if (selectedItem) {
+                        itemSelect.value = selectedItem.id;
+                        brandField.value = selectedItem.brand;
+                      }
+                    }
+
+                    // Show add-ons for sales
                     if (addOns.length) {
                       addOns.forEach(add => {
                         const checked = existingDesc.indexOf((add.name||'').toLowerCase()) !== -1;
@@ -197,8 +233,12 @@
                     } else {
                       container.innerHTML = '<div class="text-muted">No add-ons available</div>';
                     }
-                  } else { // service or other
+                  } else {
+                    // Hide item selection for service/inquiry orders
+                    itemSection.style.display = 'none';
                     label.textContent = 'Select Services';
+                    helpText.textContent = helpServiceText;
+
                     if (serviceTypes.length) {
                       serviceTypes.forEach(svc => {
                         const checked = existingDesc.indexOf((svc.name||'').toLowerCase()) !== -1;
@@ -216,6 +256,18 @@
                       });
                     }
                   }
+
+                  // Handle item selection change
+                  itemSelect.addEventListener('change', function(){
+                    if (this.value) {
+                      const selectedItem = inventoryItems.find(i => i.id === parseInt(this.value));
+                      if (selectedItem) {
+                        brandField.value = selectedItem.brand;
+                      }
+                    } else {
+                      brandField.value = '';
+                    }
+                  });
 
                   // Attach change listeners for ETA
                   container.querySelectorAll('.od-option').forEach(cb => cb.addEventListener('change', updateEditOrderEta));
