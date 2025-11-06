@@ -272,12 +272,16 @@
 
                   // Handle item selection change
                   itemSelect.addEventListener('change', function(){
+                    console.log('Item selection changed:', this.value);
                     if (this.value) {
                       const selectedItem = inventoryItems.find(i => i.id === parseInt(this.value));
+                      console.log('Selected item found:', selectedItem);
                       if (selectedItem) {
+                        console.log('Setting brand field to:', selectedItem.brand);
                         brandField.value = selectedItem.brand;
                       }
                     } else {
+                      console.log('Clearing brand field');
                       brandField.value = '';
                     }
                   });
