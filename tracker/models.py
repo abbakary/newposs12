@@ -644,3 +644,147 @@ class InvoicePatternMatcher(models.Model):
 
     def __str__(self) -> str:
         return f"{self.get_field_type_display()} - {self.name}"
+
+
+class Invoice(models.Model):
+    """Invoice records generated from orders"""
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('issued', 'Issued'),
+        ('paid', 'Paid'),
+        ('cancelled', 'Cancelled'),
+    ]
+
+    # Invoice identification
+    invoice_number = models.CharField(max_length=32, unique=True, editable=False, db_index=True)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default='draft')
+
+    # Relationships
+    branch = models.ForeignKey('Branch', on_delete=models.PROTECT, null=True, blank=True, related_name='invoices')
+    order = models.ForeignKey(Order, on_delete=models.SET_NULL, null=True, blank=True, related_name='invoices')
+    customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name='invoices')
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.SET_NULL, null=True, blank=True, related_name='invoices')
+
+    # Invoice details
+    invoice_date = models.DateField(default=timezone.now)
+    due_date = models.DateField(blank=True, null=True)
+    reference = models.CharField(max_length=128, blank=True, null=True, help_text="Customer PO or reference number")
+
+    # Amounts
+    subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    tax_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    tax_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0, help_text="Tax percentage")
+    total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    # Additional fields
+    notes = models.TextField(blank=True, null=True)
+    terms = models.TextField(blank=True, null=True)
+
+    # Tracking
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='invoices_created')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-invoice_date', '-invoice_number']
+        indexes = [
+            models.Index(fields=['invoice_number'], name='idx_invoice_number'),
+            models.Index(fields=['customer'], name='idx_invoice_customer'),
+            models.Index(fields=['order'], name='idx_invoice_order'),
+            models.Index(fields=['status'], name='idx_invoice_status'),
+        ]
+
+    def __str__(self) -> str:
+        return f"Invoice {self.invoice_number} - {self.customer.full_name}"
+
+    def calculate_totals(self):
+        """Recalculate totals from line items"""
+        self.subtotal = sum(item.line_total for item in self.line_items.all())
+        self.tax_amount = self.subtotal * (self.tax_rate / 100) if self.tax_rate else 0
+        self.total_amount = self.subtotal + self.tax_amount
+        return self
+
+    def generate_invoice_number(self):
+        """Generate sequential invoice number"""
+        if not self.invoice_number:
+            from datetime import datetime
+            today = datetime.now().date()
+            count = Invoice.objects.filter(invoice_date__year=today.year).count() + 1
+            self.invoice_number = f"INV-{today.year}-{count:05d}"
+        return self.invoice_number
+
+
+class InvoiceLineItem(models.Model):
+    """Line items in an invoice"""
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='line_items')
+
+    # Item details
+    description = models.CharField(max_length=255)
+    item_type = models.CharField(
+        max_length=16,
+        choices=[('product', 'Product'), ('service', 'Service'), ('custom', 'Custom')],
+        default='custom'
+    )
+
+    # Reference to inventory item (optional)
+    inventory_item = models.ForeignKey(InventoryItem, on_delete=models.SET_NULL, null=True, blank=True)
+
+    # Quantities and pricing
+    quantity = models.DecimalField(max_digits=10, decimal_places=2, default=1)
+    unit = models.CharField(max_length=16, blank=True, null=True, help_text="e.g., 'PCS', 'UNT', 'HR'")
+    unit_price = models.DecimalField(max_digits=12, decimal_places=2)
+
+    # Calculated
+    line_total = models.DecimalField(max_digits=12, decimal_places=2, editable=False)
+
+    # Tracking
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['invoice', 'created_at']
+
+    def save(self, *args, **kwargs):
+        self.line_total = self.quantity * self.unit_price
+        super().save(*args, **kwargs)
+        # Recalculate invoice totals
+        if self.invoice:
+            self.invoice.calculate_totals().save()
+
+    def __str__(self) -> str:
+        return f"{self.description} x {self.quantity}"
+
+
+class InvoicePayment(models.Model):
+    """Payment information for invoices"""
+    PAYMENT_METHOD_CHOICES = [
+        ('cash', 'Cash'),
+        ('cheque', 'Cheque'),
+        ('bank_transfer', 'Bank Transfer'),
+        ('card', 'Card'),
+        ('mpesa', 'M-Pesa'),
+        ('on_delivery', 'Cash on Delivery'),
+        ('on_credit', 'On Credit'),
+        ('other', 'Other'),
+    ]
+
+    invoice = models.OneToOneField(Invoice, on_delete=models.CASCADE, related_name='payment')
+
+    # Payment details
+    payment_method = models.CharField(max_length=32, choices=PAYMENT_METHOD_CHOICES)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    payment_date = models.DateField(blank=True, null=True)
+    reference = models.CharField(max_length=128, blank=True, null=True, help_text="Cheque number, transaction ID, etc.")
+
+    # Additional notes
+    notes = models.TextField(blank=True, null=True)
+
+    # Tracking
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Invoice Payment'
+        verbose_name_plural = 'Invoice Payments'
+
+    def __str__(self) -> str:
+        return f"{self.get_payment_method_display()} - {self.amount}"
