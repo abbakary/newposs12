@@ -239,7 +239,7 @@ def started_orders_dashboard(request):
     Display all started orders (status='created') for the current branch.
     Shows orders that have been initiated but not yet completed.
     Grouped by plate number for easy continuation.
-    
+
     GET params:
     - status: Filter by order status (default: 'created')
     - sort_by: Sort orders by 'started_at', 'plate_number', 'order_type' (default: '-started_at')
@@ -249,17 +249,14 @@ def started_orders_dashboard(request):
     status_filter = request.GET.get('status', 'created')
     sort_by = request.GET.get('sort_by', '-started_at')
     search_query = request.GET.get('search', '').strip()
-    
-    # Get all started orders for this branch
-    # Exclude temporary customers (those with full_name starting with "Plate " and phone starting with "PLATE_")
+
+    # Get all started orders for this branch (status='created')
+    # Note: We include all orders with status='created', including those with temporary customers
     orders = Order.objects.filter(
         branch=user_branch,
         status=status_filter
-    ).exclude(
-        customer__full_name__startswith='Plate ',
-        customer__phone__startswith='PLATE_'
     ).select_related('customer', 'vehicle')
-    
+
     # Apply search filter
     if search_query:
         orders = orders.filter(
@@ -267,13 +264,13 @@ def started_orders_dashboard(request):
         ) | orders.filter(
             customer__full_name__icontains=search_query
         )
-    
+
     # Apply sorting
     if sort_by in ['-started_at', 'started_at', 'plate_number', 'type']:
         orders = orders.order_by(sort_by)
     else:
         orders = orders.order_by('-started_at')
-    
+
     # Group orders by plate number
     orders_by_plate = {}
     for order in orders:
@@ -281,40 +278,30 @@ def started_orders_dashboard(request):
         if plate not in orders_by_plate:
             orders_by_plate[plate] = []
         orders_by_plate[plate].append(order)
-    
+
     # Calculate statistics
-    # Exclude orders with temporary customers (those with full_name starting with "Plate " and phone starting with "PLATE_")
+    # Include all started orders for accurate counts
     total_started = Order.objects.filter(
         branch=user_branch,
         status='created'
-    ).exclude(
-        customer__full_name__startswith='Plate ',
-        customer__phone__startswith='PLATE_'
     ).count()
-    
+
     today_started = Order.objects.filter(
         branch=user_branch,
         status='created',
         started_at__date=timezone.now().date()
-    ).exclude(
-        customer__full_name__startswith='Plate ',
-        customer__phone__startswith='PLATE_'
     ).count()
-    
+
     # Calculate repeated vehicles today (vehicles with 2+ orders started today)
-    # Exclude orders with temporary customers
     from django.db.models import Count
     today_orders = Order.objects.filter(
         branch=user_branch,
         status='created',
         started_at__date=timezone.now().date(),
         vehicle__isnull=False
-    ).exclude(
-        customer__full_name__startswith='Plate ',
-        customer__phone__startswith='PLATE_'
     ).values('vehicle__plate_number').annotate(order_count=Count('id')).filter(order_count__gte=2)
     repeated_vehicles_today = today_orders.count()
-    
+
     context = {
         'orders': orders,
         'orders_by_plate': orders_by_plate,
@@ -326,7 +313,7 @@ def started_orders_dashboard(request):
         'sort_by': sort_by,
         'title': 'Started Orders',
     }
-    
+
     return render(request, 'tracker/started_orders_dashboard.html', context)
 
 
