@@ -139,6 +139,7 @@
                   <th>Description</th>
                   <th style="width: 100px;" class="text-end">Qty</th>
                   <th style="width: 120px;" class="text-end">Unit Price</th>
+                  <th style="width: 100px;" class="text-end">VAT %</th>
                   <th style="width: 120px;" class="text-end">Total</th>
                   {% if invoice.status == 'draft' %}<th style="width: 60px;"></th>{% endif %}
                 </tr>
@@ -152,6 +153,7 @@
                   </td>
                   <td class="text-end">{{ item.quantity }}</td>
                   <td class="text-end">{{ item.unit_price|floatformat:2 }}</td>
+                  <td class="text-end">{{ item.tax_rate|floatformat:2 }}</td>
                   <td class="text-end"><strong>{{ item.line_total|floatformat:2 }}</strong></td>
                   {% if invoice.status == 'draft' %}
                   <td>
@@ -179,9 +181,9 @@
                   <td><strong>Subtotal</strong></td>
                   <td class="text-end"><strong>{{ invoice.subtotal|floatformat:2 }}</strong></td>
                 </tr>
-                {% if invoice.tax_rate > 0 %}
+                {% if invoice.tax_amount > 0 %}
                 <tr class="table-light">
-                  <td>Tax ({{ invoice.tax_rate }}%)</td>
+                  <td>Tax{% if invoice.tax_rate > 0 %} ({{ invoice.tax_rate }}%){% endif %}</td>
                   <td class="text-end">{{ invoice.tax_amount|floatformat:2 }}</td>
                 </tr>
                 {% endif %}
@@ -320,6 +322,17 @@
               <label class="form-label">{{ line_item_form.unit_price.label }}</label>
               {{ line_item_form.unit_price }}
               {% if line_item_form.unit_price.errors %}<div class="text-danger f-12">{{ line_item_form.unit_price.errors|striptags }}</div>{% endif %}
+            </div>
+          </div>
+          <div class="row g-3 mt-2">
+            <div class="col-md-4">
+              <label class="form-label">{{ line_item_form.tax_rate.label }}</label>
+              <div class="input-group">
+                {{ line_item_form.tax_rate }}
+                <span class="input-group-text">%</span>
+              </div>
+              {% if line_item_form.tax_rate.errors %}<div class="text-danger f-12">{{ line_item_form.tax_rate.errors|striptags }}</div>{% endif %}
+              <small class="text-muted">Leave 0 for VAT-exempt items</small>
             </div>
           </div>
         </div>

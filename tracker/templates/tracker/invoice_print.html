@@ -35,6 +35,16 @@
       min-height: 180mm;
     }
 
+    /* Logo header (top) */
+    .logo-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .logo-header img { max-height: 48px; object-fit: contain; }
+    img { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
     /* Header */
     .invoice-header { margin-bottom: 10px; padding-bottom: 8px; border-bottom: 2px solid #ccc; }
     .topbar { background:#f1f1f1; border:1px solid #e0e0e0; padding:8px 12px; margin-bottom:8px; }
@@ -251,6 +261,23 @@
   {% endif %}
 
   <div class="invoice-container">
+    <!-- Logos on header for reliable printing -->
+    <div class="logo-header">
+      <div>
+        {% if logo_left_url %}
+          <img src="{{ logo_left_url }}" alt="STM Logo">
+        {% else %}
+          <img src="{% static 'assets/images/logo/stm_logo.png' %}" alt="STM Logo">
+        {% endif %}
+      </div>
+      <div>
+        {% if logo_right_url %}
+          <img src="{{ logo_right_url }}" alt="WeCare Logo">
+        {% else %}
+          <img src="{% static 'assets/images/logo/wecare.png' %}" alt="WeCare Logo">
+        {% endif %}
+      </div>
+    </div>
     <!-- Top horizontal company bar -->
     <div class="topbar" style="color: #ffbb00d0;">
       <h1 >Superdoll Trailer Manufacture Co. (T) Ltd.</h1>
