@@ -1060,13 +1060,14 @@
   const overrunModal = overrunModalEl ? new bootstrap.Modal(overrunModalEl) : null;
   const overrunTextarea = document.getElementById('completeOverrunReason');
   const overrunError = document.getElementById('completeOverrunError');
+  const completeModalEl = document.getElementById('completeModal');
 
   const startedAtStr = '{{ order.started_at|date:"c" }}';
   const estimatedDuration = {{ order.estimated_duration|default:'null' }};
+  const orderType = '{{ order.type }}';
 
   function needsOverrun(){
-    const orderType = '{{ order.type }}';
-    if ((orderType !== 'service' && orderType !== 'inquiry' && orderType !== 'sales') || !estimatedDuration) return false;
+    if ((orderType !== 'service' && orderType !== 'sales') || !estimatedDuration) return false;
     if (!startedAtStr) return false;
     try{
       const started = new Date(startedAtStr);
@@ -1083,7 +1084,12 @@
     }
     // if order already has overrun reason on server, hiddenOverrun may be set via template; check it
     if (hiddenOverrun && hiddenOverrun.value) { completeForm.submit(); return; }
-    // show modal
+    // Close the signature modal first
+    if (completeModalEl) {
+      const modal = bootstrap.Modal.getInstance(completeModalEl);
+      if (modal) modal.hide();
+    }
+    // Show overrun modal
     if (overrunModal) overrunModal.show();
   }
 
@@ -1095,7 +1101,7 @@
     document.getElementById('completeOverrunSave').addEventListener('click', function(){
       const v = (overrunTextarea.value||'').trim();
       overrunError.style.display = 'none';
-      if (!v){ overrunError.textContent = 'Please provide a reason.'; overrunError.style.display = ''; return; }
+      if (!v){ overrunError.textContent = 'Please provide a reason for the delay.'; overrunError.style.display = ''; return; }
       // Set hidden input and submit the form
       if (hiddenOverrun) hiddenOverrun.value = v;
       // Also try to persist via AJAX to API (best-effort)
