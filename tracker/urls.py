@@ -168,6 +168,7 @@ urlpatterns = [
     # Invoices
     path("invoices/create/", views_invoice.invoice_create, name="invoice_create"),
     path("invoices/create/<int:order_id>/", views_invoice.invoice_create, name="invoice_create_from_order"),
+    path("api/invoices/search-started-orders/", views_invoice.api_search_started_orders, name="api_search_started_orders"),
     path("invoices/<int:pk>/", views_invoice.invoice_detail, name="invoice_detail"),
     path("invoices/<int:pk>/print/", views_invoice.invoice_print, name="invoice_print"),
     path("invoices/<int:pk>/pdf/", views_invoice.invoice_pdf, name="invoice_pdf"),
