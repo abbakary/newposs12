@@ -1,6 +1,5 @@
 from django.contrib import admin
-from django.contrib import admin
-from .models import Customer, Vehicle, Order, InventoryItem, Branch, ServiceType, ServiceAddon, ServiceTemplate, InvoicePatternMatcher
+from .models import Customer, Vehicle, Order, InventoryItem, Branch, ServiceType, ServiceAddon
 
 @admin.register(Customer)
 class CustomerAdmin(admin.ModelAdmin):
