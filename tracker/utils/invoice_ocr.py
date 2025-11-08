@@ -108,6 +108,57 @@ class InvoiceDataExtractor:
             pass
         return img
 
+    def _ocr_image_to_lines(self, img: Image.Image) -> str:
+        """Perform layout-aware OCR using pytesseract.image_to_data to reconstruct
+        horizontal lines from word bounding boxes. This avoids reading vertically
+        arranged text when the OCR returns words out of horizontal order.
+        """
+        try:
+            from pytesseract import Output
+            data = pytesseract.image_to_data(img, lang='eng', output_type=Output.DICT, config='--psm 6')
+            words = []
+            n = len(data.get('text', []))
+            for i in range(n):
+                txt = (data['text'][i] or '').strip()
+                if not txt:
+                    continue
+                left = int(data['left'][i] or 0)
+                top = int(data['top'][i] or 0)
+                words.append({'text': txt, 'left': left, 'top': top})
+
+            if not words:
+                return ''
+
+            # Cluster words into rows by y coordinate (top) with tolerance
+            rows = []  # list of (avg_top, [words])
+            for w in words:
+                placed = False
+                for r in rows:
+                    if abs(r[0] - w['top']) <= 12:
+                        r[1].append(w)
+                        # update avg top
+                        r[0] = int(sum(x['top'] for x in r[1]) / len(r[1]))
+                        placed = True
+                        break
+                if not placed:
+                    rows.append([w['top'], [w]])
+
+            # Sort rows by top, and words by left within each row
+            rows.sort(key=lambda x: x[0])
+            lines = []
+            for r in rows:
+                words_sorted = sorted(r[1], key=lambda x: x['left'])
+                line = ' '.join(w['text'] for w in words_sorted)
+                lines.append(line)
+
+            return '\n'.join(lines)
+        except Exception as e:
+            logger.debug(f"Layout OCR failed, falling back to image_to_string: {e}")
+            try:
+                return pytesseract.image_to_string(img, lang='eng')
+            except Exception:
+                return ''
+
     def _extract_text_from_pdf(self) -> str:
         """Extract text from PDF using PyMuPDF.
 
@@ -115,7 +166,8 @@ class InvoiceDataExtractor:
         - Try to extract text with PyMuPDF's get_text() (fast).
         - If extracted text looks empty or too short, rasterize each page and
           run OCR (pytesseract) on the rendered image. This handles scanned
-          PDFs and rotated pages consistently.
+          PDFs and rotated pages consistently. Uses layout-aware OCR to
+          reconstruct horizontal lines.
         """
         try:
             if self.file_obj:
@@ -147,7 +199,7 @@ class InvoiceDataExtractor:
                         img = Image.frombytes(mode, [pix.width, pix.height], pix.samples)
                         # Correct orientation via OSD
                         img = self._correct_image_orientation(img)
-                        page_text = pytesseract.image_to_string(img, lang='eng')
+                        page_text = self._ocr_image_to_lines(img)
                     except Exception as e:
                         logger.debug(f"PDF page raster OCR failed: {e}")
                         page_text = text or ""
