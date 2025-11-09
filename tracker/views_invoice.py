@@ -347,6 +347,17 @@ def api_upload_extract_invoice(request):
         inv.calculate_totals()
         inv.save()
 
+        # Create payment record for tracking
+        if inv.total_amount and inv.total_amount > 0:
+            try:
+                payment = InvoicePayment()
+                payment.invoice = inv
+                payment.amount = Decimal('0')  # Default to unpaid
+                payment.payment_method = 'on_delivery'  # Default payment method
+                payment.save()
+            except Exception as e:
+                logger.warning(f"Failed to create payment record for uploaded invoice: {e}")
+
         # If linked to started order, update order with finalized details
         if order:
             try:
