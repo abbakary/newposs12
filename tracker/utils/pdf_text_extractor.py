@@ -129,9 +129,15 @@ def parse_invoice_data(text: str) -> dict:
         find(r'(?:Customer\s*Name|Customer|Bill\s*To|Buyer|Name)[\s:\-]*([^\n\r\:]{3,120})') or
         find(r'(?:To\s*[:.\s]+)([^\n\r]{3,100})')
     )
-    
+
     # Extract address
     address = find(r'(?:Address|Addr\.|Add|Location)[\s:\-]*([^\n\r]{5,200})')
+
+    # Extract phone
+    phone = find(r'(?:Tel|Phone|Mobile|Contact|Phone\s*Number)[\s:\-]*(\+?[0-9\s\-\(\)]{7,20})')
+
+    # Extract email
+    email = find(r'(?:Email|E-mail|Contact\s*Email)[\s:\-]*([^\s\n\r:@]+@[^\s\n\r:]+)')
     
     # Extract monetary amounts
     subtotal = find(r'(?:Sub\s*Total|Subtotal|Net\s*(?:Value|Amount))[\s:\-]*([0-9\,]+\.?\d{0,2})')
