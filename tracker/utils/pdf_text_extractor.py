@@ -424,35 +424,42 @@ def parse_invoice_data(text: str) -> dict:
             text_parts = [p.strip() for p in text_only.split('|') if p.strip()]
 
             # Case 1: Line looks like "Sr Code Description Qty Rate Value" (table row)
-            if len(numbers) >= 2 and text_parts:
+            if len(numbers) >= 1 and text_parts:
                 # Try to identify what the numbers represent
                 # Usually: Sr#, ItemCode, Qty, Rate, Value
-                # Extract numeric values more carefully
-
                 # Description is text parts joined
                 desc = ' '.join(text_parts)
                 if desc and len(desc) > 2:
-                    # Extract numbers - usually qty and value are smaller/larger respectively
-                    value = numbers[-1] if len(numbers) >= 1 else None
-                    qty = 1
+                    try:
+                        # Convert all numbers to floats for comparison
+                        float_numbers = [float(n.replace(',', '')) for n in numbers]
 
-                    # If 2+ numbers, second-to-last might be qty
-                    if len(numbers) >= 2:
-                        try:
-                            qty_candidate = float(numbers[-2].replace(',', ''))
-                            if 0.1 < qty_candidate < 10000:
-                                if '.' not in numbers[-2] or qty_candidate.is_integer():
-                                    qty = int(qty_candidate) if qty_candidate.is_integer() else qty_candidate
-                        except Exception:
-                            pass
+                        # Largest number is likely the value/price
+                        value = max(float_numbers) if float_numbers else None
 
-                    current_item = {
-                        'description': desc[:255],
-                        'qty': qty if isinstance(qty, int) else int(qty) if isinstance(qty, float) and qty.is_integer() else 1,
-                        'value': to_decimal(value)
-                    }
-                    items.append(current_item)
-                    current_item = {}
+                        # Look for qty among smaller numbers (usually 1-100, often integer)
+                        qty = 1
+                        for fn in float_numbers:
+                            # If it's smaller than value and looks like a quantity
+                            if value and fn < value and 0.1 < fn < 10000:
+                                # Check if it's likely a quantity (integer or very small decimal)
+                                if fn == int(fn) or (fn - int(fn)) < 0.5:
+                                    qty = int(fn)
+                                    break
+
+                        # If we only have one number, use it as value, qty stays 1
+                        if len(numbers) == 1:
+                            value = float_numbers[0]
+
+                        current_item = {
+                            'description': desc[:255],
+                            'qty': qty,
+                            'value': to_decimal(str(value)) if value else None
+                        }
+                        items.append(current_item)
+                        current_item = {}
+                    except Exception as e:
+                        logger.warning(f"Error parsing item line: {line_stripped}, {e}")
 
             # Case 2: Line is purely descriptive text (likely description for current item)
             elif text_parts and not numbers:
