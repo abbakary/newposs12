@@ -548,38 +548,45 @@ def parse_invoice_data(text: str) -> dict:
                     if len(float_numbers) == 1:
                         # Single number: likely the total value
                         item['value'] = to_decimal(str(float_numbers[0]))
+                        item['rate'] = item['value']  # If no qty, rate = value
                     elif len(float_numbers) == 2:
                         # Two numbers: qty and value (or rate and value)
                         # Smaller number is likely qty if it's an integer
                         if float_numbers[0] < 100 and float_numbers[0] == int(float_numbers[0]):
                             item['qty'] = int(float_numbers[0])
                             item['value'] = to_decimal(str(float_numbers[1]))
+                            item['rate'] = to_decimal(str(float_numbers[1] / float_numbers[0]))
                         elif float_numbers[1] < 100 and float_numbers[1] == int(float_numbers[1]):
                             item['qty'] = int(float_numbers[1])
                             item['value'] = to_decimal(str(float_numbers[0]))
+                            item['rate'] = to_decimal(str(float_numbers[0] / float_numbers[1]))
                         else:
                             # Default: smaller is qty, larger is value
                             if float_numbers[0] < float_numbers[1]:
                                 item['qty'] = int(float_numbers[0]) if float_numbers[0] == int(float_numbers[0]) else float_numbers[0]
                                 item['value'] = to_decimal(str(float_numbers[1]))
+                                item['rate'] = to_decimal(str(float_numbers[1] / float_numbers[0]))
                             else:
                                 item['qty'] = int(float_numbers[1]) if float_numbers[1] == int(float_numbers[1]) else float_numbers[1]
                                 item['value'] = to_decimal(str(float_numbers[0]))
+                                item['rate'] = to_decimal(str(float_numbers[0] / float_numbers[1]))
                     elif len(float_numbers) >= 3:
                         # Multiple numbers: parse as Sr#, Code, Qty, Rate, Value
                         # Typical patterns:
-                        # Sr | Code | Qty | Rate | Value
-                        # Or: Code | Qty | Rate | Value (no Sr)
-                        # Or: Code | Qty | Value (no Rate)
+                        # Sr | Code | Qty | Rate | Value (5 numbers)
+                        # Or: Code | Qty | Rate | Value (4 numbers, no Sr)
+                        # Or: Code | Qty | Value (3 numbers, no Rate)
 
                         max_num = max(float_numbers)
 
                         # Find qty: small integer (1-1000)
                         qty_candidate = None
-                        for fn in float_numbers:
+                        qty_index = None
+                        for idx, fn in enumerate(float_numbers):
                             if 0.5 < fn < 1000 and (fn == int(fn) or abs(fn - round(fn)) < 0.1):
                                 if fn <= max_num / 10:  # Qty should be much smaller than value
                                     qty_candidate = int(round(fn))
+                                    qty_index = idx
                                     break
 
                         if qty_candidate:
@@ -587,6 +594,18 @@ def parse_invoice_data(text: str) -> dict:
 
                         # Largest number is the total value
                         item['value'] = to_decimal(str(max_num))
+
+                        # Try to find rate (second largest or calculated from qty)
+                        if qty_candidate and qty_candidate > 0:
+                            # Calculate rate from value / qty
+                            item['rate'] = to_decimal(str(max_num / qty_candidate))
+                        else:
+                            # If we have qty_index, try to find rate near it
+                            if qty_index is not None and qty_index < len(float_numbers) - 1:
+                                # Number after qty might be rate
+                                potential_rate = float_numbers[qty_index + 1]
+                                if potential_rate != max_num:  # Not the value
+                                    item['rate'] = to_decimal(str(potential_rate))
 
                     # Only add if we have at least description and value
                     if item.get('description') and (item.get('value') or item.get('qty')):
