@@ -691,6 +691,7 @@
                           <div class="row mb-3">
                             <div class="col-12"><strong>Delivery Terms:</strong> ${deliveryTerms || 'N/A'}</div>
                           </div>
+                          ${hdr.tax_rate ? '<div class="row mb-3"><div class="col-12"><strong>Tax Rate (VAT%):</strong> ' + (typeof hdr.tax_rate === 'string' ? hdr.tax_rate : hdr.tax_rate.toFixed(2)) + '%</div></div>' : ''}
                           <div class="mb-3"><strong>Customer Information</strong></div>
                           <div class="row mb-2">
                             <div class="col-12"><strong>Name:</strong> ${customer}</div>
