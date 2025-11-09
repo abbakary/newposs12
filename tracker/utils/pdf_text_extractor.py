@@ -207,26 +207,50 @@ def parse_invoice_data(text: str) -> dict:
         """Check if text looks like a company/person name vs an address."""
         if not text:
             return False
-        # Customer names can be company names (usually all caps or mixed case) or person names
-        # They don't contain location indicators
-        address_keywords = ['street', 'avenue', 'road', 'box', 'p.o', 'po', 'floor', 'apt', 'suite', 'district', 'region']
-        has_no_address_keywords = not any(kw in text.lower() for kw in address_keywords)
-        # Company names often have 'CO', 'LTD', 'INC', etc.
-        is_capitalized = len(text) > 2 and (text[0].isupper() or text.isupper())
-        # Don't reject if it contains location names in a company context (like "SAID SALIM BAKHRESA CO LTD")
-        return has_no_address_keywords and is_capitalized and len(text) > 3
+        text_lower = text.lower()
+
+        # Strong address indicators
+        address_keywords = ['street', 'avenue', 'road', 'box', 'p.o', 'po box', 'floor', 'apt', 'suite',
+                           'district', 'region', 'city', 'zip', 'postal code', 'building']
+
+        # If it has strong address keywords, it's probably not a company name
+        for kw in address_keywords:
+            if kw in text_lower:
+                return False
+
+        # Company indicators (company names usually have these)
+        company_indicators = ['ltd', 'inc', 'corp', 'co', 'company', 'llc', 'limited', 'enterprise',
+                            'trading', 'group', 'industries', 'services', 'solutions', 'consulting']
+        has_company_indicator = any(ind in text_lower for ind in company_indicators)
+
+        # Must be reasonably capitalized/formatted
+        is_well_formatted = len(text) > 2 and (text[0].isupper() or text.isupper())
+
+        # Company names should be at least 4 chars, properly capitalized, and possibly have company indicators
+        return is_well_formatted and len(text) >= 4 and (has_company_indicator or ' ' not in text or len(text.split()) <= 5)
 
     def is_likely_address(text):
         """Check if text looks like an address."""
         if not text:
             return False
-        # Addresses often contain locations, street info, numbers, or are multi-word with specific patterns
-        address_indicators = ['street', 'avenue', 'road', 'box', 'p.o', 'po', 'floor', 'apt', 'suite',
-                             'district', 'region', 'city', 'country', 'zip', 'postal', 'dar', 'dar-es', 'tanzania', 'nairobi', 'kenya']
-        has_indicators = any(ind in text.lower() for ind in address_indicators)
+        text_lower = text.lower()
+
+        # Strong address indicators
+        address_indicators = ['street', 'avenue', 'road', 'box', 'p.o', 'po box', 'floor', 'apt', 'suite',
+                             'district', 'region', 'city', 'country', 'zip', 'postal', 'dar', 'dar-es',
+                             'tanzania', 'nairobi', 'kenya', 'building']
+
+        # Has location name or postal indicators
+        has_indicators = any(ind in text_lower for ind in address_indicators)
+
+        # Has numbers (house/building numbers)
         has_numbers = bool(re.search(r'\d+', text))
-        has_multipart = ',' in text or len(text.split()) > 2  # Addresses often have multiple parts
-        return has_indicators or (has_numbers and has_multipart)
+
+        # Has multiple parts (usually separated by commas or just multiple words)
+        has_multipart = ',' in text or ' ' in text
+
+        # Address must have indicators OR have numbers and multiple parts
+        return has_indicators or (has_numbers and has_multipart and len(text) > 5)
 
     # Extract customer name
     customer_name = extract_field_value([
