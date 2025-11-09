@@ -91,6 +91,8 @@ def api_extract_invoice_preview(request):
         'header': {
             'invoice_no': header.get('invoice_no'),
             'customer_name': header.get('customer_name'),
+            'phone': header.get('phone'),
+            'email': header.get('email'),
             'address': header.get('address'),
             'date': header.get('date'),
             'subtotal': float(header.get('subtotal') or 0),
