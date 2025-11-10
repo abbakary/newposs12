@@ -93,6 +93,23 @@
           <h6 class="mb-0">Invoice Information</h6>
         </div>
         <div class="card-body">
+          {% if invoice.seller_name %}
+          <div class="mb-3">
+            <h6 class="mb-1">Seller / Supplier</h6>
+            <strong>{{ invoice.seller_name }}</strong>
+            {% if invoice.seller_address %}
+            <div class="small text-muted">{{ invoice.seller_address }}</div>
+            {% endif %}
+            {% if invoice.seller_phone %}
+            <div class="small text-muted">Phone: {{ invoice.seller_phone }}</div>
+            {% endif %}
+            {% if invoice.seller_email %}
+            <div class="small text-muted">Email: {{ invoice.seller_email }}</div>
+            {% endif %}
+            <hr/>
+          </div>
+          {% endif %}
+
           <div class="row mb-3">
             <div class="col-6">
               <label class="form-label mb-1"><small class="text-muted">Date</small></label>
