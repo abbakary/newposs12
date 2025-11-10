@@ -463,37 +463,47 @@ def parse_invoice_data(text: str) -> dict:
             if not address or len(address) < 3:
                 address = None
 
-    # Extract phone/tel - specifically look for "Tel:" format
+    # Extract phone/tel - look for "Tel:" specifically
     phone = None
 
-    # Pattern 1: Look for "Tel :" or "Tel:" with number/contact info
-    # This pattern is more specific - requires the Tel: label to be present
-    tel_pattern = re.compile(r'Tel\s*[:=]\s*([^\n]+?)(?=\n(?:Fax|Email|Del\.|Attended|Kind|Reference|Remarks|Date|PI|Code)\b|$)', re.I | re.MULTILINE)
-    tel_match = tel_pattern.search(normalized_text)
+    # Pattern 1: Look for lines that have "Tel :" or "Tel=" followed by actual phone content
+    # Must have the Tel label and actual phone data
+    lines_data = [line.strip() for line in normalized_text.split('\n') if line.strip()]
 
-    if tel_match:
-        phone_text = tel_match.group(1).strip()
+    for idx, line in enumerate(lines_data):
+        # Look for "Tel :" or "Tel=" on a line
+        if re.search(r'\bTel\s*[:=]', line, re.I):
+            # Extract what comes after "Tel :"
+            tel_match = re.search(r'\bTel\s*[:=]\s*([^\n]+?)(?:\s*Fax|$)', line, re.I)
+            if tel_match:
+                phone_candidate = tel_match.group(1).strip()
 
-        # Clean up: remove common field labels that might follow
-        # Look for the actual phone number before labels like "Fax", "Email", etc.
-        phone_text = re.sub(r'\s*(?:Fax|Email|Del|Attended|Kind|Reference|Remarks|Date|PI|Code).*', '', phone_text, flags=re.I).strip()
+                # Clean up: remove field labels
+                phone_candidate = re.sub(r'\s+(?:Fax|Email|Del|Attended|Kind|Reference).*', '', phone_candidate, flags=re.I).strip()
 
-        # If it contains a slash (like "Tel: 123/456"), take first part as main phone
-        if '/' in phone_text:
-            phone_text = phone_text.split('/')[0].strip()
+                # Must have some actual content (not just spaces or labels)
+                if phone_candidate and len(phone_candidate) > 2 and phone_candidate.lower() not in ['fax', 'email', 'date']:
+                    # If contains slash, keep first part (usually main phone)
+                    if '/' in phone_candidate:
+                        phone_candidate = phone_candidate.split('/')[0].strip()
 
-        # Only keep if it has some content (digits or is a meaningful contact)
-        if phone_text and len(phone_text) > 2:
-            phone = phone_text
+                    # Accept if it has digits or is a meaningful value
+                    if re.search(r'\d', phone_candidate) or len(phone_candidate) > 5:
+                        phone = phone_candidate
+                        break
 
-    # Pattern 2: Fallback - look for phone numbers (sequences of digits with +, -, spaces, parentheses)
+    # Pattern 2: If not found yet, look for "Telephone" or "Phone" labels
     if not phone:
-        phone_number_pattern = re.compile(r'Tel\s*[:=]?\s*([\+\d][\d\s\-\(\)\.]{4,})', re.I | re.MULTILINE)
-        phone_match = phone_number_pattern.search(normalized_text)
-        if phone_match:
-            phone = phone_match.group(1).strip()
-            # Remove trailing field labels
-            phone = re.sub(r'\s+(?:Fax|Email|Del|Attended).*', '', phone, flags=re.I).strip()
+        for line in lines_data:
+            if re.search(r'\b(?:Telephone|Phone|Cell|Mobile)\s*[:=]', line, re.I):
+                tel_match = re.search(r'\b(?:Telephone|Phone|Cell|Mobile)\s*[:=]\s*([^\n]+?)$', line, re.I)
+                if tel_match:
+                    phone_candidate = tel_match.group(1).strip()
+                    # Remove trailing labels
+                    phone_candidate = re.sub(r'\s+(?:Fax|Email).*', '', phone_candidate, flags=re.I).strip()
+                    if phone_candidate and len(phone_candidate) > 2:
+                        phone = phone_candidate
+                        break
 
     # Extract email - look for email pattern in the text
     email = None
