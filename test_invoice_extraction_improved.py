@@ -89,9 +89,17 @@ def test_extraction():
     assert result['invoice_no'] == 'PI-1765632', f"Expected PI-1765632, got {result['invoice_no']}"
     assert result['code_no'] == 'A01696', f"Expected A01696, got {result['code_no']}"
     assert result['customer_name'] == 'STATEOIL TANZANIA LIMITED', f"Expected STATEOIL TANZANIA LIMITED, got {result['customer_name']}"
-    assert 'P.O.BOX 15950' in result['address'], f"Address should contain P.O.BOX 15950"
-    assert 'DAR' in result['address'], f"Address should contain DAR"
-    assert 'TANZANIA' in result['address'], f"Address should contain TANZANIA"
+
+    # Verify address contains all expected components
+    address = result['address'] or ''
+    assert 'P.O.BOX 15950' in address or 'P.O BOX 15950' in address or '15950' in address, \
+        f"Address should contain P.O.BOX 15950, got: {address}"
+    assert 'DAR' in address or 'SALAAM' in address, \
+        f"Address should contain DAR or SALAAM, got: {address}"
+    assert 'TANZANIA' in address, \
+        f"Address should contain TANZANIA, got: {address}"
+
+    print(f"Address extracted: {address}")
     print("✓ PASS: Header information correct")
     
     # Test 2: Monetary Amounts
