@@ -491,7 +491,25 @@ def parse_invoice_data(text: str) -> dict:
         r'Sales\s*Tax'
     ]))
 
-    # Extract Gross Value / Total
+    # Extract Tax Rate (percentage) - look for patterns like "18.00%" or "18%"
+    tax_rate = None
+    tax_rate_pattern = re.compile(r'VAT.*?(\d+(?:\.\d+)?)\s*%|Tax\s*Rate.*?(\d+(?:\.\d+)?)\s*%', re.I)
+    tax_rate_match = tax_rate_pattern.search(normalized_text)
+    if tax_rate_match:
+        rate_str = tax_rate_match.group(1) or tax_rate_match.group(2)
+        try:
+            tax_rate = Decimal(rate_str)
+        except (ValueError, TypeError):
+            tax_rate = None
+
+    # Fallback: if we have subtotal and tax, calculate the tax rate
+    if not tax_rate and subtotal and tax and subtotal > 0:
+        try:
+            tax_rate = (tax / subtotal) * Decimal('100')
+        except (ValueError, TypeError, Exception):
+            tax_rate = None
+
+    # Gross Value / Total
     total = to_decimal(find_amount([
         r'Gross\s*Value',
         r'Total\s*Amount',
@@ -853,6 +871,7 @@ def parse_invoice_data(text: str) -> dict:
         'reference': reference,
         'subtotal': subtotal,
         'tax': tax,
+        'tax_rate': tax_rate,
         'total': total,
         'items': items,
         'payment_method': payment_method,
@@ -961,6 +980,7 @@ def extract_from_bytes(file_bytes, filename: str = '') -> dict:
             'reference': parsed.get('reference'),
             'subtotal': parsed.get('subtotal'),
             'tax': parsed.get('tax'),
+            'tax_rate': parsed.get('tax_rate'),
             'total': parsed.get('total'),
             'payment_method': parsed.get('payment_method'),
             'delivery_terms': parsed.get('delivery_terms'),

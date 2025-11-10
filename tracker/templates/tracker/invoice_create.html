@@ -664,11 +664,56 @@
                         const d = data.data;
                         // Populate modal with extracted header data
                         const hdr = d.header || {};
-                        extractedHeader.innerHTML = `<div><strong>Invoice No:</strong> ${hdr.invoice_no || hdr.code_no || ''} &nbsp; <strong>Date:</strong> ${hdr.date || ''}</div><div><strong>Customer:</strong> ${hdr.customer_name || ''}</div><div><strong>Net:</strong> ${hdr.subtotal || ''} TSH &nbsp; <strong>VAT:</strong> ${hdr.tax || ''} TSH &nbsp; <strong>Gross:</strong> ${hdr.total || ''} TSH</div>`;
+                        const invoiceNo = hdr.invoice_no || hdr.code_no || 'N/A';
+                        const date = hdr.date || 'N/A';
+                        const customer = hdr.customer_name || 'N/A';
+                        const phone = hdr.phone || '';
+                        const email = hdr.email || '';
+                        const address = hdr.address || '';
+                        const subtotal = hdr.subtotal ? parseFloat(hdr.subtotal).toLocaleString('en-US', {minimumFractionDigits: 2}) : '0.00';
+                        const tax = hdr.tax ? parseFloat(hdr.tax).toLocaleString('en-US', {minimumFractionDigits: 2}) : '0.00';
+                        const total = hdr.total ? parseFloat(hdr.total).toLocaleString('en-US', {minimumFractionDigits: 2}) : '0.00';
+                        const reference = hdr.reference || '';
+                        const attendedBy = hdr.attended_by || '';
+                        const kindAttention = hdr.kind_attention || '';
+                        const paymentMethod = hdr.payment_method || '';
+                        const deliveryTerms = hdr.delivery_terms || '';
+
+                        let headerHtml = `<div class="mb-3"><strong>Invoice Information</strong></div>
+                          <div class="row mb-2">
+                            <div class="col-md-6"><strong>Invoice No:</strong> ${invoiceNo}</div>
+                            <div class="col-md-6"><strong>Date:</strong> ${date}</div>
+                          </div>
+                          <div class="row mb-2">
+                            <div class="col-md-6"><strong>Reference:</strong> ${reference || 'N/A'}</div>
+                            <div class="col-md-6"><strong>Payment Method:</strong> ${paymentMethod || 'N/A'}</div>
+                          </div>
+                          <div class="row mb-3">
+                            <div class="col-12"><strong>Delivery Terms:</strong> ${deliveryTerms || 'N/A'}</div>
+                          </div>
+                          ${hdr.tax_rate ? '<div class="row mb-3"><div class="col-12"><strong>Tax Rate (VAT%):</strong> ' + (typeof hdr.tax_rate === 'string' ? hdr.tax_rate : hdr.tax_rate.toFixed(2)) + '%</div></div>' : ''}
+                          <div class="mb-3"><strong>Customer Information</strong></div>
+                          <div class="row mb-2">
+                            <div class="col-12"><strong>Name:</strong> ${customer}</div>
+                          </div>
+                          ${phone ? '<div class="row mb-2"><div class="col-12"><strong>Phone:</strong> ' + phone + '</div></div>' : ''}
+                          ${email ? '<div class="row mb-2"><div class="col-12"><strong>Email:</strong> ' + email + '</div></div>' : ''}
+                          ${address ? '<div class="row mb-3"><div class="col-12"><strong>Address:</strong> ' + address + '</div></div>' : ''}
+                          ${attendedBy ? '<div class="row mb-2"><div class="col-12"><strong>Attended By:</strong> ' + attendedBy + '</div></div>' : ''}
+                          ${kindAttention ? '<div class="row mb-3"><div class="col-12"><strong>Kind Attention:</strong> ' + kindAttention + '</div></div>' : ''}
+                          <div class="mb-3"><strong>Amounts</strong></div>
+                          <div class="row mb-2">
+                            <div class="col-md-4"><strong>Subtotal:</strong> ${subtotal} TSH</div>
+                            <div class="col-md-4"><strong>VAT/Tax:</strong> ${tax} TSH</div>
+                            <div class="col-md-4"><strong>Total:</strong> ${total} TSH</div>
+                          </div>`;
+
+                        extractedHeader.innerHTML = headerHtml;
                         extractedItemsBody.innerHTML = '';
                         (d.items || []).forEach(it=>{
                           const tr = document.createElement('tr');
-                          tr.innerHTML = `<td>${it.code||''}</td><td>${it.description||''}</td><td>${it.qty||''}</td><td>${it.value||''}</td>`;
+                          const itemValue = it.value ? parseFloat(it.value).toLocaleString('en-US', {minimumFractionDigits: 2}) : '';
+                          tr.innerHTML = `<td>${it.code||''}</td><td>${it.description||''}</td><td>${it.qty||''}</td><td>${itemValue}</td>`;
                           extractedItemsBody.appendChild(tr);
                         });
                         extractedRaw.textContent = d.raw_text ? d.raw_text.substring(0,2000) : '';
@@ -692,20 +737,30 @@
                     const hdr = d.header;
                     const f = document.querySelector('form');
 
-                    // Map extracted header fields to form inputs
+                    // Comprehensive mapping of extracted fields to form field names
+                    // Maps extraction field names to form input names
                     const map = {
                       'customer_full_name': hdr.customer_name || '',
                       'customer_phone': hdr.phone || '',
                       'customer_email': hdr.email || '',
                       'customer_address': hdr.address || '',
-                      'reference': hdr.invoice_no || hdr.code_no || hdr.reference || ''
+                      'reference': hdr.reference || hdr.invoice_no || hdr.code_no || '',
+                      'attended_by': hdr.attended_by || '',
+                      'kind_attention': hdr.kind_attention || '',
+                      'remarks': hdr.remarks || '',
+                      'notes': hdr.remarks || '',
+                      'payment_method': hdr.payment_method || '',
+                      'delivery_terms': hdr.delivery_terms || '',
+                      'tax_rate': hdr.tax_rate || ''
                     };
 
+                    // Apply mapped values to form fields
                     Object.keys(map).forEach(k=>{
                       const el = f.querySelector('[name="'+k+'"]');
                       if (el) {
                         el.value = map[k];
                         el.dispatchEvent(new Event('input', {bubbles: true}));
+                        el.dispatchEvent(new Event('change', {bubbles: true}));
                       }
                     });
 
@@ -713,7 +768,6 @@
                     if (hdr.date) {
                       const dateEl = f.querySelector('[name="invoice_date"]');
                       if (dateEl) {
-                        // Try to parse the date
                         let formattedDate = hdr.date;
                         // If date looks like dd/mm/yyyy, convert to yyyy-mm-dd
                         const dateMatch = hdr.date.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
@@ -722,6 +776,25 @@
                         }
                         dateEl.value = formattedDate;
                         dateEl.dispatchEvent(new Event('input', {bubbles: true}));
+                        dateEl.dispatchEvent(new Event('change', {bubbles: true}));
+                      }
+                    }
+
+                    // Handle tax_rate field if extracted
+                    if (hdr.tax) {
+                      const taxEl = f.querySelector('[name="tax_rate"]');
+                      if (taxEl) {
+                        // Extract percentage from tax field if it looks like "18.00%"
+                        let taxRate = hdr.tax;
+                        if (typeof taxRate === 'string') {
+                          const taxMatch = taxRate.match(/(\d+(?:\.\d+)?)/);
+                          if (taxMatch) {
+                            taxRate = taxMatch[1];
+                          }
+                        }
+                        taxEl.value = taxRate;
+                        taxEl.dispatchEvent(new Event('input', {bubbles: true}));
+                        taxEl.dispatchEvent(new Event('change', {bubbles: true}));
                       }
                     }
 

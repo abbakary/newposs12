@@ -279,13 +279,28 @@ def api_upload_extract_invoice(request):
             inv.invoice_date = timezone.localdate()
 
         # Set invoice details
-        inv.reference = (header.get('invoice_no') or header.get('code_no') or '').strip() or f"UPLOAD-{timezone.now().strftime('%Y%m%d%H%M%S')}"
-        inv.notes = (header.get('address') or '').strip() or ''
+        inv.reference = (header.get('reference') or header.get('invoice_no') or header.get('code_no') or '').strip() or f"UPLOAD-{timezone.now().strftime('%Y%m%d%H%M%S')}"
+        inv.attended_by = (header.get('attended_by') or '').strip() or None
+        inv.kind_attention = (header.get('kind_attention') or '').strip() or None
+        inv.remarks = (header.get('remarks') or '').strip() or None
+        inv.notes = (header.get('notes') or '').strip() or ''
 
         # Set monetary fields with proper defaults (use correct field names from extraction)
         inv.subtotal = header.get('subtotal') or Decimal('0')
         inv.tax_amount = header.get('tax') or Decimal('0')
         inv.total_amount = header.get('total') or (inv.subtotal + inv.tax_amount)
+
+        # Set tax rate if extracted (percentage)
+        if header.get('tax_rate'):
+            try:
+                tax_rate_val = header.get('tax_rate')
+                if isinstance(tax_rate_val, str):
+                    tax_rate_val = Decimal(tax_rate_val.replace('%', '').strip())
+                else:
+                    tax_rate_val = Decimal(str(tax_rate_val))
+                inv.tax_rate = tax_rate_val
+            except (ValueError, TypeError):
+                inv.tax_rate = Decimal('0')
 
         # Ensure totals are valid
         if inv.subtotal is None:
@@ -306,7 +321,7 @@ def api_upload_extract_invoice(request):
                     # Extract and validate quantity
                     qty = it.get('qty') or 1
                     try:
-                        qty = int(float(qty)) if qty else 1
+                        qty = float(qty) if qty else 1
                     except (ValueError, TypeError):
                         qty = 1
 
@@ -314,8 +329,21 @@ def api_upload_extract_invoice(request):
                     if qty < 1:
                         qty = 1
 
-                    # Extract unit price (value or rate)
-                    unit_price = it.get('value') or it.get('rate') or Decimal('0')
+                    # Extract unit price - prefer 'rate' (unit price), fallback to calculated from value/qty
+                    unit_price = it.get('rate')
+                    if not unit_price:
+                        # If rate not available, try to calculate from value and qty
+                        value = it.get('value')
+                        if value and qty > 0:
+                            try:
+                                value_dec = Decimal(str(value).replace(',', '')) if isinstance(value, str) else Decimal(str(value))
+                                unit_price = value_dec / Decimal(str(qty))
+                            except (ValueError, TypeError, Exception):
+                                unit_price = Decimal('0')
+                        else:
+                            unit_price = Decimal('0')
+
+                    # Convert unit_price to Decimal
                     try:
                         if isinstance(unit_price, (int, float)):
                             unit_price = Decimal(str(unit_price))
@@ -330,7 +358,7 @@ def api_upload_extract_invoice(request):
                     item_code = (it.get('item_code') or it.get('code') or '').strip() or None
                     description = (it.get('description') or 'Item').strip()
 
-                    # Create line item
+                    # Create line item with proper unit_price
                     line = InvoiceLineItem(
                         invoice=inv,
                         code=item_code,
@@ -343,8 +371,10 @@ def api_upload_extract_invoice(request):
                 except Exception as e:
                     logger.warning(f"Failed to create invoice line item from {it}: {e}")
 
-        # Recalculate totals
-        inv.calculate_totals()
+        # Recalculate totals only if we have line items
+        # If no line items were created from extraction, preserve the extracted totals
+        if inv.line_items.exists():
+            inv.calculate_totals()
         inv.save()
 
         # Create payment record for tracking
