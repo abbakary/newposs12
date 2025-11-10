@@ -418,8 +418,13 @@
     
     <!-- Top horizontal company bar -->
     <div class="topbar" style="color: #ffbb00d0;">
+      {% if invoice.seller_name %}
+      <h1>{{ invoice.seller_name }}</h1>
+      <div class="sub">{% if invoice.seller_address %}{{ invoice.seller_address }}{% else %}&nbsp;{% endif %}{% if invoice.seller_phone %} Tel.{{ invoice.seller_phone }}{% endif %}{% if invoice.seller_email %} Email: {{ invoice.seller_email }}{% endif %}{% if invoice.seller_tax_id %} Tax ID: {{ invoice.seller_tax_id }}{% endif %}{% if invoice.seller_vat_reg %} VAT Reg. No.: {{ invoice.seller_vat_reg }}{% endif %}</div>
+      {% else %}
       <h1>Superdoll Trailer Manufacture Co. (T) Ltd.</h1>
       <div class="sub">P.O. Box 16541 DSM, Tel.+255-22-2860930-2863467, Fax +255-22-2865412/3, Email: stm@superdoll-tz.com, Tax ID No.100-199-157, VAT Reg. No.10-0085-15-E</div>
+      {% endif %}
     </div>
 
     <!-- Centered title -->
