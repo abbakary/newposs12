@@ -178,7 +178,20 @@ def api_upload_extract_invoice(request):
         cust_name = (header.get('customer_name') or '').strip()
         cust_phone = (header.get('phone') or '').strip()
 
-        if cust_name and cust_phone:
+        # Prefer composite identifier (name + plate) when available
+        if cust_name and plate:
+            try:
+                composite = CustomerService.find_customer_by_name_and_plate(
+                    branch=user_branch,
+                    full_name=cust_name,
+                    plate_number=plate,
+                )
+                if composite:
+                    customer_obj = composite
+            except Exception as e:
+                logger.warning(f"Composite name+plate lookup failed: {e}")
+
+        if not customer_obj and cust_name and cust_phone:
             try:
                 # Try to find existing customer with extracted name and phone
                 customer_obj, created = CustomerService.create_or_get_customer(
@@ -192,7 +205,7 @@ def api_upload_extract_invoice(request):
             except Exception as e:
                 logger.warning(f"Failed to create/get customer from extracted data: {e}")
                 customer_obj = None
-        elif cust_name:
+        elif not customer_obj and cust_name:
             # Only name available, try to find matching customer
             try:
                 customer_obj = Customer.objects.filter(
@@ -451,26 +464,34 @@ def api_upload_extract_invoice(request):
             return out
 
         aggregated = _aggregate_items(items) if items else []
-        for it in aggregated:
-            try:
-                line = InvoiceLineItem(
+        # Create line items without triggering per-item save() to avoid recalculating invoice totals
+        try:
+            to_create = []
+            for it in aggregated:
+                qty = Decimal(str(it.get('qty') or '1'))
+                price = Decimal(str(it.get('unit_price') or '0'))
+                line_total = qty * price
+                to_create.append(InvoiceLineItem(
                     invoice=inv,
                     code=it.get('code') or None,
                     description=it.get('description') or 'Item',
-                    quantity=it.get('qty') or Decimal('1'),
+                    quantity=qty,
                     unit=it.get('unit') or None,
-                    unit_price=it.get('unit_price') or Decimal('0')
-                )
-                line.save()
-            except Exception as e:
-                logger.warning(f"Failed to create invoice line item from aggregated {it}: {e}")
+                    unit_price=price,
+                    tax_rate=Decimal('0'),
+                    line_total=line_total,
+                    tax_amount=Decimal('0'),
+                ))
+            if to_create:
+                InvoiceLineItem.objects.bulk_create(to_create)
+        except Exception as e:
+            logger.warning(f"Failed to bulk create invoice line items: {e}")
 
-        # IMPORTANT: For uploaded invoices, preserve the extracted Net Value, VAT, and Gross Value
-        # DO NOT recalculate totals from line items
-        # Line items are created for reference/detail, but the invoice totals come from the extracted document
-        # The extracted subtotal, tax_amount, and total_amount were already set above (lines 308-337)
-        # We save without recalculating to maintain the accuracy of the extracted values
-        inv.save()
+        # IMPORTANT: Preserve extracted Net, VAT, and Gross values for uploaded invoices
+        inv.subtotal = header.get('subtotal') or Decimal('0')
+        inv.tax_amount = header.get('tax') or Decimal('0')
+        inv.total_amount = header.get('total') or (inv.subtotal + inv.tax_amount)
+        inv.save(update_fields=['subtotal', 'tax_amount', 'total_amount'])
 
         # Create payment record for tracking
         if inv.total_amount and inv.total_amount > 0:

@@ -131,12 +131,6 @@
           </div>
           <div class="modal-body">
             <div id="extractedHeader" class="mb-3"></div>
-            <div id="extractedItems" class="table-responsive">
-              <table class="table table-sm table-striped">
-                <thead><tr><th>Item Code</th><th>Description</th><th>Qty</th><th>Value</th></tr></thead>
-                <tbody id="extractedItemsBody"></tbody>
-              </table>
-            </div>
             <div id="extractedRaw" class="mt-3 small text-muted"></div>
           </div>
           <div class="modal-footer">
@@ -614,7 +608,6 @@
                 const reviewModalEl = document.getElementById('extractionReviewModal');
                 const reviewModal = reviewModalEl && typeof bootstrap !== 'undefined' ? new bootstrap.Modal(reviewModalEl) : null;
                 const extractedHeader = document.getElementById('extractedHeader');
-                const extractedItemsBody = document.getElementById('extractedItemsBody');
                 const extractedRaw = document.getElementById('extractedRaw');
                 const applyBtn = document.getElementById('applyExtractionBtn');
                 const createBtn = document.getElementById('createFromExtractionBtn');
@@ -731,44 +724,35 @@
                           sellerInfo += '<hr/>';
                         }
 
-                        let headerHtml = sellerInfo + `<div class="mb-3"><strong>Invoice Information</strong></div>
-                          <div class="row mb-2">
-                            <div class="col-md-6"><strong>Invoice No:</strong> ${invoiceNo}</div>
-                            <div class="col-md-6"><strong>Date:</strong> ${date}</div>
+                        let headerHtml = sellerInfo + `<div class=\"mb-3\"><strong>Invoice Summary</strong></div>
+                          <div class=\"invoice-preview-box mb-3\">
+                            <div class=\"invoice-preview-row\"><span>Net Value (TSH):</span><span>${subtotal} TSH</span></div>
+                            <div class=\"invoice-preview-row\"><span>VAT${hdr.tax_rate ? ' (' + (typeof hdr.tax_rate === 'string' ? hdr.tax_rate : hdr.tax_rate.toFixed(2)) + '%)' : ''}:</span><span>${tax} TSH</span></div>
+                            <div class=\"invoice-preview-row\" style=\"font-weight:800; border-top:1px solid #e6e6e6; padding-top:8px\"><span>Gross Value (TSH):</span><span>${total} TSH</span></div>
                           </div>
-                          <div class="row mb-2">
-                            <div class="col-md-6"><strong>Reference:</strong> ${reference || 'N/A'}</div>
-                            <div class="col-md-6"><strong>Payment Method:</strong> ${paymentMethod || 'N/A'}</div>
+                          <div class=\"mb-3\"><strong>Invoice Information</strong></div>
+                          <div class=\"row mb-2\">
+                            <div class=\"col-md-6\"><strong>Invoice No:</strong> ${invoiceNo}</div>
+                            <div class=\"col-md-6\"><strong>Date:</strong> ${date}</div>
                           </div>
-                          <div class="row mb-3">
-                            <div class="col-12"><strong>Delivery Terms:</strong> ${deliveryTerms || 'N/A'}</div>
+                          <div class=\"row mb-2\">
+                            <div class=\"col-md-6\"><strong>Reference:</strong> ${reference || 'N/A'}</div>
+                            <div class=\"col-md-6\"><strong>Payment Method:</strong> ${paymentMethod || 'N/A'}</div>
                           </div>
-                          ${hdr.tax_rate ? '<div class="row mb-3"><div class="col-12"><strong>Tax Rate (VAT%):</strong> ' + (typeof hdr.tax_rate === 'string' ? hdr.tax_rate : hdr.tax_rate.toFixed(2)) + '%</div></div>' : ''}
-                          <div class="mb-3"><strong>Customer Information</strong></div>
-                          <div class="row mb-2">
-                            <div class="col-12"><strong>Name:</strong> ${customer}</div>
+                          <div class=\"row mb-3\">
+                            <div class=\"col-12\"><strong>Delivery Terms:</strong> ${deliveryTerms || 'N/A'}</div>
                           </div>
-                          ${phone ? '<div class="row mb-2"><div class="col-12"><strong>Phone:</strong> ' + phone + '</div></div>' : ''}
-                          ${email ? '<div class="row mb-2"><div class="col-12"><strong>Email:</strong> ' + email + '</div></div>' : ''}
-                          ${address ? '<div class="row mb-3"><div class="col-12"><strong>Address:</strong> ' + address + '</div></div>' : ''}
-                          ${attendedBy ? '<div class="row mb-2"><div class="col-12"><strong>Attended By:</strong> ' + attendedBy + '</div></div>' : ''}
-                          ${kindAttention ? '<div class="row mb-3"><div class="col-12"><strong>Kind Attention:</strong> ' + kindAttention + '</div></div>' : ''}
-                          <div class="mb-3"><strong>Amounts</strong></div>
-                          <div class="row mb-2">
-                            <div class="col-md-4"><strong>Subtotal:</strong> ${subtotal} TSH</div>
-                            <div class="col-md-4"><strong>VAT/Tax:</strong> ${tax} TSH</div>
-                            <div class="col-md-4"><strong>Total:</strong> ${total} TSH</div>
-                          </div>`;
+                          <div class=\"mb-3\"><strong>Customer Information</strong></div>
+                          <div class=\"row mb-2\">
+                            <div class=\"col-12\"><strong>Name:</strong> ${customer}</div>
+                          </div>
+                          ${phone ? '<div class=\"row mb-2\"><div class=\"col-12\"><strong>Phone:</strong> ' + phone + '</div></div>' : ''}
+                          ${email ? '<div class=\"row mb-2\"><div class=\"col-12\"><strong>Email:</strong> ' + email + '</div></div>' : ''}
+                          ${address ? '<div class=\"row mb-3\"><div class=\"col-12\"><strong>Address:</strong> ' + address + '</div></div>' : ''}
+                          ${attendedBy ? '<div class=\"row mb-2\"><div class=\"col-12\"><strong>Attended By:</strong> ' + attendedBy + '</div></div>' : ''}
+                          ${kindAttention ? '<div class=\"row mb-3\"><div class=\"col-12\"><strong>Kind Attention:</strong> ' + kindAttention + '</div></div>' : ''}`;
 
                         if (extractedHeader) extractedHeader.innerHTML = headerHtml;
-                        if (extractedItemsBody) extractedItemsBody.innerHTML = '';
-                        (d.items || []).forEach(it=>{
-                          if (!extractedItemsBody) return;
-                          const tr = document.createElement('tr');
-                          const itemValue = it.value ? parseFloat(it.value).toLocaleString('en-US', {minimumFractionDigits: 2}) : '';
-                          tr.innerHTML = `<td>${it.code||''}</td><td>${it.description||''}</td><td>${it.qty||''}</td><td>${itemValue}</td>`;
-                          extractedItemsBody.appendChild(tr);
-                        });
                         if (extractedRaw) extractedRaw.textContent = d.raw_text ? d.raw_text.substring(0,2000) : '';
                         window.__lastInvoiceExtraction = d;
                         if (reviewModal) {

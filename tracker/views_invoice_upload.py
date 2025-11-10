@@ -172,38 +172,63 @@ def api_create_invoice_from_upload(request):
     
     try:
         with transaction.atomic():
-            # Get or create customer
+            # Collect basic customer fields
             customer_name = request.POST.get('customer_name', '').strip()
             customer_phone = request.POST.get('customer_phone', '').strip()
             customer_email = request.POST.get('customer_email', '').strip() or None
             customer_address = request.POST.get('customer_address', '').strip() or None
             customer_type = request.POST.get('customer_type', 'personal')
-            
-            if not customer_name or not customer_phone:
-                return JsonResponse({
-                    'success': False,
-                    'message': 'Customer name and phone are required'
-                })
-            
-            # Try to find existing customer or create new one
-            customer_obj, created = CustomerService.create_or_get_customer(
-                branch=user_branch,
-                full_name=customer_name,
-                phone=customer_phone,
-                email=customer_email,
-                address=customer_address,
-                customer_type=customer_type,
-                create_if_missing=True
-            )
-            
-            if not customer_obj:
-                return JsonResponse({
-                    'success': False,
-                    'message': 'Failed to create/get customer'
-                })
-            
-            # Get or create vehicle if plate provided
             plate = (request.POST.get('plate') or '').strip().upper() or None
+
+            # Resolve customer using composite identifier (name + plate) when available
+            customer_obj = None
+            if customer_name and plate:
+                try:
+                    customer_obj = CustomerService.find_customer_by_name_and_plate(
+                        branch=user_branch,
+                        full_name=customer_name,
+                        plate_number=plate,
+                    )
+                except Exception as e:
+                    logger.warning(f"Composite name+plate lookup failed: {e}")
+
+            # If not found via name+plate, require phone to create/find by name+phone
+            if not customer_obj:
+                if not customer_name or not customer_phone:
+                    return JsonResponse({
+                        'success': False,
+                        'message': 'Customer name and phone are required'
+                    })
+                customer_obj, created = CustomerService.create_or_get_customer(
+                    branch=user_branch,
+                    full_name=customer_name,
+                    phone=customer_phone,
+                    email=customer_email,
+                    address=customer_address,
+                    customer_type=customer_type,
+                    create_if_missing=True
+                )
+                if not customer_obj:
+                    return JsonResponse({
+                        'success': False,
+                        'message': 'Failed to create/get customer'
+                    })
+            else:
+                # Update basic contact info if we found existing by name+plate
+                updated = False
+                try:
+                    if customer_email and (not customer_obj.email or customer_obj.email != customer_email):
+                        customer_obj.email = customer_email
+                        updated = True
+                    if customer_address and (not customer_obj.address or customer_obj.address != customer_address):
+                        customer_obj.address = customer_address
+                        updated = True
+                    if updated:
+                        customer_obj.save(update_fields=['email', 'address'])
+                except Exception:
+                    pass
+
+            # Get or create vehicle if plate provided
             vehicle = None
             if plate:
                 try:
@@ -367,27 +392,35 @@ def api_create_invoice_from_upload(request):
                 except Exception as e:
                     logger.warning(f"Failed to stage line item aggregation: {e}")
 
-            for v in bucket.values():
-                try:
-                    line = InvoiceLineItem(
+            # Create line items without triggering per-item save() to avoid invoice total recalculation
+            try:
+                to_create = []
+                for v in bucket.values():
+                    qty = Decimal(str(v['qty'] or 1))
+                    price = Decimal(str(v['unit_price'] or Decimal('0')))
+                    line_total = qty * price
+                    to_create.append(InvoiceLineItem(
                         invoice=inv,
                         code=v['code'],
                         description=v['description'],
-                        quantity=v['qty'] or 1,
+                        quantity=qty,
                         unit=v['unit'],
-                        unit_price=v['unit_price'] or Decimal('0')
-                    )
-                    line.save()
-                except Exception as e:
-                    logger.warning(f"Failed to create aggregated line item: {e}")
+                        unit_price=price,
+                        tax_rate=Decimal('0'),
+                        line_total=line_total,
+                        tax_amount=Decimal('0'),
+                    ))
+                if to_create:
+                    InvoiceLineItem.objects.bulk_create(to_create)
+            except Exception as e:
+                logger.warning(f"Failed to bulk create aggregated line items: {e}")
 
-            # IMPORTANT: For uploaded invoices, preserve the extracted Net Value, VAT, and Gross Value
-            # DO NOT recalculate totals from line items
-            # Line items are created for reference/detail, but the invoice totals come from the extracted document
-            # The extracted subtotal, tax_amount, and total_amount were already set above (lines 297-299)
-            # We save without recalculating to maintain the accuracy of the extracted values
-            inv.save()
-            
+            # IMPORTANT: Preserve extracted Net, VAT, Gross values for uploaded invoices
+            inv.subtotal = subtotal
+            inv.tax_amount = tax_amount
+            inv.total_amount = total_amount or (subtotal + tax_amount)
+            inv.save(update_fields=['subtotal', 'tax_amount', 'total_amount'])
+
             # Create payment record if total > 0
             if inv.total_amount > 0:
                 try:

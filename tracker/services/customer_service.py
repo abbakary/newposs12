@@ -22,6 +22,39 @@ class CustomerService:
     """Service for managing customer creation with proper deduplication and visit tracking."""
 
     @staticmethod
+    def find_customer_by_name_and_plate(
+        branch: Optional[Branch],
+        full_name: str,
+        plate_number: str,
+    ) -> Optional[Customer]:
+        """
+        Find an existing customer by composite identifier: (customer name + plate number) within a branch.
+        Used for uploaded invoices to decide between existing vs new customers.
+        Returns the matching Customer if found, otherwise None.
+        """
+        try:
+            if not branch or not full_name or not plate_number:
+                return None
+            name = (full_name or "").strip()
+            plate = (plate_number or "").strip().upper()
+            if not name or not plate:
+                return None
+            from tracker.models import Vehicle
+            vehicle = (
+                Vehicle.objects.select_related("customer")
+                .filter(
+                    plate_number__iexact=plate,
+                    customer__branch=branch,
+                    customer__full_name__iexact=name,
+                )
+                .first()
+            )
+            return vehicle.customer if vehicle else None
+        except Exception as e:
+            logger.warning(f"Error finding customer by name+plate: {e}")
+            return None
+
+    @staticmethod
     def find_duplicate_customer(
         branch: Optional[Branch],
         full_name: str,
