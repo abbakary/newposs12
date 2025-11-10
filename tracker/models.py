@@ -453,6 +453,14 @@ class Invoice(models.Model):
     kind_attention = models.CharField(max_length=128, blank=True, null=True)
     remarks = models.TextField(blank=True, null=True)
 
+    # Seller / Supplier information extracted from invoices (optional)
+    seller_name = models.CharField(max_length=255, blank=True, null=True)
+    seller_address = models.TextField(blank=True, null=True)
+    seller_phone = models.CharField(max_length=64, blank=True, null=True)
+    seller_email = models.CharField(max_length=128, blank=True, null=True)
+    seller_tax_id = models.CharField(max_length=64, blank=True, null=True)
+    seller_vat_reg = models.CharField(max_length=64, blank=True, null=True)
+
     # Tracking
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='invoices_created')
     created_at = models.DateTimeField(auto_now_add=True)
