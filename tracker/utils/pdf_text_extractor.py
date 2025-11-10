@@ -160,6 +160,59 @@ def parse_invoice_data(text: str) -> dict:
         if cleaned:
             cleaned_lines.append(cleaned)
 
+    # Detect seller block at top of document (company header) and strip it from normalized_text
+    seller_name = None
+    seller_address = None
+    seller_phone = None
+    seller_email = None
+    seller_tax_id = None
+    seller_vat_reg = None
+
+    try:
+        # Look at the first few lines for company header
+        top_block = cleaned_lines[:8] if len(cleaned_lines) >= 1 else []
+        split_idx = None
+        for i, l in enumerate(top_block):
+            # Stop seller block when we hit typical invoice/customer markers
+            if re.search(r'Proforma|Invoice\b|PI\b|Customer\b|Bill\s*To|Date\b|Customer\s*Reference|Invoice\s*No|Code', l, re.I):
+                split_idx = i
+                break
+        if split_idx is None:
+            # if no explicit marker, assume first 1-2 lines may be seller header
+            split_idx = min(2, len(top_block))
+        seller_lines = top_block[:split_idx]
+        if seller_lines:
+            # Seller name is usually first line
+            seller_name = seller_lines[0].strip() if seller_lines[0].strip() else None
+            if len(seller_lines) > 1:
+                seller_address = ' '.join([ln.strip() for ln in seller_lines[1:] if ln.strip()])
+
+            # Try to extract phone and email and tax numbers from seller_lines block
+            seller_block_text = '\n'.join(seller_lines)
+            phone_match = re.search(r'(?:Tel\.?|Telephone|Phone)[:\s]*([\+\d][\d\s\-/\(\)\,]{4,}\d)', seller_block_text, re.I)
+            if phone_match:
+                seller_phone = phone_match.group(1).strip()
+            email_match = re.search(r'([\w\.-]+@[\w\.-]+\.\w+)', seller_block_text)
+            if email_match:
+                seller_email = email_match.group(1).strip()
+            tax_match = re.search(r'(?:Tax\s*ID|Tax\s*No\.?|Tax\s*Number)[:\s]*([A-Z0-9\-\/]*)', seller_block_text, re.I)
+            if tax_match:
+                seller_tax_id = tax_match.group(1).strip()
+            vat_match = re.search(r'(?:VAT\s*Reg\.?|VAT\s*No\.?|VAT)[:\s]*([A-Z0-9\-\/]*)', seller_block_text, re.I)
+            if vat_match:
+                seller_vat_reg = vat_match.group(1).strip()
+
+            # Remove seller block from normalized_text so subsequent extraction focuses on invoice content
+            try:
+                normalized_text = normalized_text.replace(seller_block_text, '', 1)
+                # Rebuild lines after removal
+                lines = normalized_text.split('\n')
+            except Exception:
+                pass
+    except Exception:
+        # If detection fails, continue without stripping
+        seller_name = seller_name or None
+
     # Helper to find field value - try multiple strategies including searching ahead
     def extract_field_value(label_patterns, text_to_search=None, max_distance=10, stop_at_patterns=None):
         """Extract value after a label using flexible pattern matching and distance-based search.
