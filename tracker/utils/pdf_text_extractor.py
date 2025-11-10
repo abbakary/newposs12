@@ -477,21 +477,31 @@ def parse_invoice_data(text: str) -> dict:
                     if address:
                         break
 
-        # Fallback: Look for city names followed by country if still no address
+        # Fallback: Look for city/country combinations if still no address
         if not address:
             for idx, line in enumerate(lines):
-                # Look for city names followed by country
-                if re.search(r'\b(DAR|DAR-ES-SALAAM|NAIROBI|KAMPALA)\b', line, re.I):
+                # Look for major city names (common in East Africa)
+                if re.search(r'\b(DAR|DAR-ES-SALAAM|NAIROBI|KAMPALA|KIGALI|MOMBASA|MOSHI|ARUSHA|DODOMA)\b', line, re.I):
                     address_parts = [line]
+
                     # Check next line(s) for country or additional address
-                    for j in range(idx + 1, min(idx + 3, len(lines))):
+                    for j in range(idx + 1, min(idx + 4, len(lines))):
                         next_line = lines[j].strip()
-                        if re.search(r'\b(TANZANIA|KENYA|UGANDA|RWANDA|BURUNDI)\b', next_line, re.I):
+
+                        # Stop at empty or label lines
+                        if not next_line or re.match(r'^(?:Tel|Fax|Email|Phone|Address|Reference|Code|Type|Date|Attended|Kind|Cust|Ref)', next_line, re.I):
+                            break
+
+                        # Include country or address lines
+                        if re.search(r'\b(TANZANIA|KENYA|UGANDA|RWANDA|BURUNDI|CONGO|MALAWI|ZAMBIA)\b', next_line, re.I):
                             address_parts.append(next_line)
                             break
-                        elif len(next_line) > 2 and not re.match(r'^(?:Tel|Fax|Email|Phone|Address|Reference|Code|Type|Date)', next_line, re.I):
+                        elif len(next_line) > 2 and (next_line.isupper() or re.search(r'\d', next_line)):
+                            # Address line or postal code
                             address_parts.append(next_line)
+                        else:
                             break
+
                     address = ' '.join(address_parts).strip()
                     if address:
                         break
