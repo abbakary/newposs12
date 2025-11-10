@@ -109,6 +109,12 @@ def api_extract_invoice_preview(request):
             'remarks': header.get('remarks'),
             'attended_by': header.get('attended_by'),
             'kind_attention': header.get('kind_attention'),
+            'seller_name': header.get('seller_name'),
+            'seller_address': header.get('seller_address'),
+            'seller_phone': header.get('seller_phone'),
+            'seller_email': header.get('seller_email'),
+            'seller_tax_id': header.get('seller_tax_id'),
+            'seller_vat_reg': header.get('seller_vat_reg'),
         },
         'items': [
             {
