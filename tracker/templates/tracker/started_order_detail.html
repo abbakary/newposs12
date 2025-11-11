@@ -915,13 +915,21 @@
                 const header = data.header || {};
                 if (manualForm){
                   // Populate customer fields
-                  manualForm.querySelector('input[name="customer_name"]').value = header.customer_name || '';
-                  manualForm.querySelector('input[name="customer_phone"]').value = header.phone || '';
-                  manualForm.querySelector('input[name="customer_email"]').value = header.email || '';
-                  manualForm.querySelector('input[name="customer_address"]').value = header.address || '';
+                  const customerNameField = manualForm.querySelector('input[name="customer_name"]');
+                  if (customerNameField) customerNameField.value = header.customer_name || '';
+
+                  const customerPhoneField = manualForm.querySelector('input[name="customer_phone"]');
+                  if (customerPhoneField) customerPhoneField.value = header.phone || '';
+
+                  const customerEmailField = manualForm.querySelector('input[name="customer_email"]');
+                  if (customerEmailField) customerEmailField.value = header.email || '';
+
+                  const customerAddressField = manualForm.querySelector('input[name="customer_address"]');
+                  if (customerAddressField) customerAddressField.value = header.address || '';
 
                   // Populate invoice fields
-                  manualForm.querySelector('input[name="invoice_number"]').value = header.invoice_no || header.code_no || '';
+                  const invoiceNumberField = manualForm.querySelector('input[name="invoice_number"]');
+                  if (invoiceNumberField) invoiceNumberField.value = header.invoice_no || header.code_no || '';
 
                   // Handle invoice_date - convert from dd/mm/yyyy to yyyy-mm-dd for HTML date input
                   let invoiceDateValue = '';
@@ -933,11 +941,17 @@
                       invoiceDateValue = header.date;
                     }
                   }
-                  manualForm.querySelector('input[name="invoice_date"]').value = invoiceDateValue;
+                  const invoiceDateField = manualForm.querySelector('input[name="invoice_date"]');
+                  if (invoiceDateField) invoiceDateField.value = invoiceDateValue;
 
-                  manualForm.querySelector('input[name="subtotal"]').value = header.subtotal || '';
-                  manualForm.querySelector('input[name="tax_amount"]').value = header.tax || '';
-                  manualForm.querySelector('input[name="total_amount"]').value = header.total || '';
+                  const subtotalField = manualForm.querySelector('input[name="subtotal"]');
+                  if (subtotalField) subtotalField.value = header.subtotal || '';
+
+                  const taxField = manualForm.querySelector('input[name="tax_amount"]');
+                  if (taxField) taxField.value = header.tax || '';
+
+                  const totalField = manualForm.querySelector('input[name="total_amount"]');
+                  if (totalField) totalField.value = header.total || '';
 
                   // Populate additional fields
                   const remarksField = manualForm.querySelector('textarea[name="remarks"]');
