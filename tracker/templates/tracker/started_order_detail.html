@@ -318,12 +318,23 @@
                                 <input type="email" name="customer_email" class="form-control" placeholder="email@example.com">
                               </div>
                               <div class="col-md-6">
-                                <label class="form-label">Type</label>
-                                <select name="customer_type" class="form-select">
+                                <label class="form-label">Customer Type *</label>
+                                <select name="customer_type" id="invoiceCustomerType" class="form-select" required>
+                                  <option value="">Select customer type</option>
                                   <option value="personal">Personal</option>
-                                  <option value="company">Company</option>
+                                  <option value="company">Private Company</option>
                                   <option value="ngo">NGO</option>
                                   <option value="government">Government</option>
+                                </select>
+                              </div>
+                            </div>
+                            <div class="row mb-2" id="personalSubtypeWrapper" style="display:none;">
+                              <div class="col-md-6">
+                                <label class="form-label">Personal Subtype</label>
+                                <select name="customer_personal_subtype" class="form-select">
+                                  <option value="">Select subtype</option>
+                                  <option value="owner">Owner</option>
+                                  <option value="driver">Driver</option>
                                 </select>
                               </div>
                             </div>
